@@ -1,0 +1,8 @@
+Name: EmbraceMolekSyntez
+Version: 0.0.1
+Title: Embrace Molek Syntez
+Desc: Adds gameplay elements heavily inspired by the Zachtronics game "Molek Syntez".
+DLL: "EmbraceMolekSyntez/bin/Debug/net452/EmbraceMolekSyntez.dll"
+Dependencies:
+- Name: Quintessential
+  Version: 0.3.0
