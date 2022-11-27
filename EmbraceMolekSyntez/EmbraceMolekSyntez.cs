@@ -24,10 +24,13 @@ public class MainClass : QuintessentialMod
 	public static PartType EmitterSimple;
 	public static Texture debug_arrow, emitterIcon, emitterIconHover, emitter_armBase;
 
-	const int NoTranslate = 0;
-	const int GrabDropTranslate = 1;
-	//const int MovementTranslate = 2;
+	private const int NoDecoding = 0;
+	private const int GrabDropDecoding = 1;
+	private const int MovementDecoding = 2;
 
+	private static LocString error_trash;
+	private static LocString error_output;
+	private static LocString error_rotate;
 
 	public static void playSound(Sound SOUND, float VOLUME, Sim sim = null, SolutionEditorBase seb = null)
 	{
@@ -54,7 +57,10 @@ public class MainClass : QuintessentialMod
 
 	//---------------------------------------------------//
 	//internal helper methods
-	private static void BeamHelper(Part emitter, PartSimState partSimState, List<Molecule> molecules)
+
+
+
+	private static HexIndex BeamHelper(PartSimState partSimState, List<Molecule> molecules, out int dist)
 	{
 		//prepare to find where the gripper should go
 		HexIndex pos = partSimState.field_2724;
@@ -64,15 +70,15 @@ public class MainClass : QuintessentialMod
 		switch (rotation)
 		{
 			default:
-			case 0: inSight = hex => hex.Q > pos.Q &&		  hex.R == pos.R		;	beamDistance = hex => hex.Q - pos.Q;	break;
-			case 1: inSight = hex => hex.R > pos.R &&		  hex.Q == pos.Q		;	beamDistance = hex => hex.R - pos.R;	break;
-			case 2: inSight = hex => hex.R > pos.R && hex.Q + hex.R == pos.Q + pos.R;	beamDistance = hex => hex.R - pos.R;	break;
-			case 3: inSight = hex => hex.Q < pos.Q &&		  hex.R == pos.R		;	beamDistance = hex => pos.Q - hex.Q;	break;
-			case 4: inSight = hex => hex.R < pos.R &&		  hex.Q == pos.Q		;	beamDistance = hex => pos.R - hex.R;	break;
-			case 5: inSight = hex => hex.R < pos.R && hex.Q + hex.R == pos.Q + pos.R;	beamDistance = hex => pos.R - hex.R;	break;
+			case 0: inSight = hex =>		 hex.R == pos.R			&& hex.Q > pos.Q;	beamDistance = hex => hex.Q - pos.Q;	break;
+			case 1: inSight = hex =>		 hex.Q == pos.Q			&& hex.R > pos.R;	beamDistance = hex => hex.R - pos.R;	break;
+			case 2: inSight = hex => hex.Q + hex.R == pos.Q + pos.R	&& hex.R > pos.R;	beamDistance = hex => hex.R - pos.R;	break;
+			case 3: inSight = hex => 		 hex.R == pos.R			&& hex.Q < pos.Q;	beamDistance = hex => pos.Q - hex.Q;	break;
+			case 4: inSight = hex => 		 hex.Q == pos.Q			&& hex.R < pos.R;	beamDistance = hex => pos.R - hex.R;	break;
+			case 5: inSight = hex => hex.Q + hex.R == pos.Q + pos.R	&& hex.R < pos.R;	beamDistance = hex => pos.R - hex.R;	break;
 		}
-		//move the gripper to the nearest atom it's looking at
-		//if there is none in that direction, or we hit a chamber wall first, place it on the arm base instead (should be guaranteed no atom)
+		//look for the nearest inSight atom
+		//if there is none in that direction, or we hit a chamber wall first, look at the armbase instead
 		int min = int.MaxValue;
 		HexIndex minHex = pos;
 		foreach (var molecule in molecules)
@@ -86,18 +92,24 @@ public class MainClass : QuintessentialMod
 				}
 			}
 		}
-		List<HexIndex> chamberHexes = new(); ///////////////////////////////////////////////////////////////////// replace later with actual list of chamber wall hexes
+		List<HexIndex> chamberHexes = new(); //////////////////////////////////// replace later with actual list of chamber wall hexes, somehow
 		foreach (var hex in chamberHexes)
 		{
 			if (inSight(hex) && beamDistance(hex) < min)
 			{
 				minHex = pos;
+				min = 0;
 				break;
 			}
 		}
-		// change arm length so the gripper sits in the desired position
-		partSimState.field_2725 = beamDistance(minHex);
-		partSimState.field_2737 = 0;
+
+		if (min == int.MaxValue || minHex == pos)
+		{
+			min = 0;
+		}
+
+		dist = min;
+		return minHex;
 	}
 
 
@@ -113,6 +125,11 @@ public class MainClass : QuintessentialMod
 
 	public override void LoadPuzzleContent()
 	{
+		error_trash = class_134.method_253("This arm cannot dispose of alchemicules.", string.Empty);
+		error_output = class_134.method_253("This arm cannot output alchemicules.", string.Empty);
+		error_rotate = class_134.method_253("This arm cannot rotate.", string.Empty);
+		
+		
 		string path = "embraceMolekSyntez/textures/parts/";
 		debug_arrow = class_235.method_615(path + "debug_arrow");
 		emitterIcon = class_235.method_615(path + "icons/emitter");
@@ -124,25 +141,26 @@ public class MainClass : QuintessentialMod
 		//Interfacing Manipulator: 70g, can also trash and output targets
 		//Universal Manipulator: 100g, a swivel-mount and interfacing manipulator
 
-		EmitterSimple = new PartType()
-			{
-				/*ID*/field_1528 = "embrace-moleksyntez-emitter",
-				/*Name*/field_1529 = class_134.method_253("Fixed-Direction Manipulator", string.Empty),
-				/*Desc*/field_1530 = class_134.method_253("A standard manipulator that can push, pull, and pivot targeted alchemicules. Push and pull are executed using the Extend and Retract instructions, respectively.", string.Empty),
-				/*Cost*/field_1531 = 40,
-				/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
-				/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
-				/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
-				/*Piston?*/field_1535 = true,//default=false
-				/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-				/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
-				/*Icon*/field_1547 = emitterIcon,
-				/*Hover Icon*/field_1548 = emitterIconHover,
-				/*Glow (Shadow)*/ field_1549 = class_238.field_1989.field_97.field_382,
-				/*Stroke (Outline)*/ field_1550 = class_238.field_1989.field_97.field_383,
-				/*Permissions*/field_1551 = Permissions.SimpleArm,
-			};
+		
 
+		EmitterSimple = new PartType()
+		{
+			/*ID*/field_1528 = "embrace-moleksyntez-emitter",
+			/*Name*/field_1529 = class_134.method_253("Fixed-Direction Manipulator", string.Empty),
+			/*Desc*/field_1530 = class_134.method_253("A standard manipulator that can push, pull, and pivot targeted alchemicules. Push and pull are executed using the Extend and Retract instructions, respectively.", string.Empty),
+			/*Cost*/field_1531 = 40,
+			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
+			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
+			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
+			/*Piston?*/field_1535 = true,//default=false
+			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
+			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
+			/*Icon*/field_1547 = emitterIcon,
+			/*Hover Icon*/field_1548 = emitterIconHover,
+			/*Glow (Shadow)*/ //field_1549 = class_238.field_1989.field_97.field_382,
+			/*Stroke (Outline)*/ //field_1550 = class_238.field_1989.field_97.field_383,
+			/*Permissions*/field_1551 = Permissions.SimpleArm,
+		};
 
 		QApi.AddPartType(EmitterSimple, (part, pos, editor, renderer) => {
 			//draw code
@@ -154,8 +172,7 @@ public class MainClass : QuintessentialMod
 
 		QApi.AddPartTypeToPanel(EmitterSimple, PartTypes.field_1768);//inserts part type after piston
 
-
-		FakeGripper.LoadPuzzleContent();
+		//FakeGripper.LoadPuzzleContent();
 		//------------------------- HOOKING -------------------------//
 		On.CompiledProgramGrid.method_852 += CompiledProgramGrid_Method_852; // interfere with how instructions are read
 		hook_Sim_method_1829 = new Hook(
@@ -166,7 +183,7 @@ public class MainClass : QuintessentialMod
 
 	public override void Unload()
 	{
-		FakeGripper.Unload();
+		//FakeGripper.Unload();
 		hook_Sim_method_1829.Dispose();
 	}
 
@@ -174,50 +191,144 @@ public class MainClass : QuintessentialMod
 
 	private static void OnSimMethod1829(orig_Sim_method_1829 orig, Sim sim_self, enum_127 param_5366)
 	{
+		bool isGrabDropPhase = param_5366 != 0;
 		var sim_dyn = new DynamicData(sim_self);
-		var partSimStates = sim_dyn.Get<Dictionary<Part, PartSimState>>("field_3821");
 		var SEB = sim_dyn.Get<SolutionEditorBase>("field_3818");
 		var solution = SEB.method_502();
 		var partList = solution.field_3919;
+		var partSimStates = sim_dyn.Get<Dictionary<Part, PartSimState>>("field_3821");
+		var class401s = sim_dyn.Get<Dictionary<Part, Sim.class_401>>("field_3822");
+		var molecules = sim_dyn.Get<List<Molecule>>("field_3823");
+		var droppedMolecules = sim_dyn.Get<List<Molecule>>("field_3828");
+
 		var emitterList = new List<Part>(partList.Where(x => x.method_1159() == EmitterSimple));
 		var emitterDict = new Dictionary<Part, int>();
-		var molecules = sim_dyn.Get<List<Molecule>>("field_3823");
 
-		bool isCycleZero = sim_self.method_1818() == 0;
-
-		
-		
+		// prep for method_1829
 		foreach (var emitter in emitterList)
 		{
-			//
-			if (isCycleZero) // remove the extend/retract limits
+			// update the emitter and its manipulator
+			var emitterState = partSimStates[emitter];
+			var manipulator = emitter.field_2696[0];
+			var manipulatorState = partSimStates[manipulator];
+			
+			if (isGrabDropPhase) 
 			{
-				//FieldInfo fieldInfoMin = typeof(Part).GetField("field_2689", BindingFlags.Static | BindingFlags.Public);
-				//fieldInfoMin.SetValue(null, 0);
-				//FieldInfo fieldInfoMax = typeof(Part).GetField("field_2690", BindingFlags.Static | BindingFlags.Public);
-				//fieldInfoMax.SetValue(null, int.MaxValue);
+				//then ungrip the manipulator
+				Molecule molecule;
+				if (manipulatorState.field_2729.method_99<Molecule>(out molecule) && !droppedMolecules.Contains(molecule))
+				{
+					//drop the molecule, too
+					droppedMolecules.Add(molecule);
+				}
+				manipulatorState.field_2728 = false;
+				manipulatorState.field_2729 = (Maybe<Molecule>) struct_18.field_1431;
+				manipulatorState.field_2740 = false;
+
+				//update emitter and manipulator to the new pos
+				var oldPos = manipulatorState.field_2724;
+				int dist;
+				var newPos = BeamHelper(partSimStates[emitter], molecules, out dist);
+				emitterState.field_2725 = dist;
+				emitterState.field_2736 = dist;
+				manipulatorState.field_2724 = newPos;
+				manipulatorState.field_2734 = newPos;
+
+
 			}
 
-			//save the index value
+			//save the index value, just in case
 			emitterDict.Add(emitter, emitter.field_2703);
 			//overwrite so we can read it in method_852 as a parameter
-			if (param_5366 == (enum_127)1)
+			if (isGrabDropPhase)
 			{
-				emitter.field_2703 = GrabDropTranslate;
+				emitter.field_2703 = GrabDropDecoding;
 			}
 			else
 			{
-				emitter.field_2703 = NoTranslate;
+				emitter.field_2703 = MovementDecoding;
 			}
-			BeamHelper(emitter, partSimStates[emitter], molecules);
 		}
-
+		
 		sim_dyn.Set("field_3821", partSimStates);
+		sim_dyn.Set("field_3828", droppedMolecules);
 		///////////////
 		orig(sim_self, param_5366);
 		///////////////
 		partSimStates = sim_dyn.Get<Dictionary<Part, PartSimState>>("field_3821");
-		molecules = sim_dyn.Get<List<Molecule>>("field_3823");
+
+		//custom instruction-execution code
+		var compiledProgramSim = sim_self.method_1820();
+		int cycleNumber = sim_self.method_1818();
+		foreach (var emitter in emitterList)
+		{
+			var emitterState = partSimStates[emitter];
+			var manipulator = emitter.field_2696[0];
+			var manipulatorState = partSimStates[manipulator];
+			// don't animate the gripper grabbing/dropping
+			manipulatorState.field_2740 = false;
+
+			//overwrite the index again and fetch the ACTUAL instruction
+			emitter.field_2703 = NoDecoding;
+			var instructionType = compiledProgramSim.method_852(cycleNumber, emitter, out Maybe<int> _);
+			var instructionCategory = instructionType.field_2548;
+
+			Vector2 errorPos1 = class_187.field_1742.method_492(emitterState.field_2724);
+			Vector2 errorPos2 = class_187.field_1742.method_492(manipulatorState.field_2724);
+
+			//then execute
+			if (isGrabDropPhase)
+			{
+				if (instructionCategory == (enum_144) 5) // GRAB/DROP
+				{
+					bool isGrab = instructionType.field_2549;
+					if (emitter.method_1159() == EmitterSimple || emitter.method_1159() == EmitterSimple)
+					{
+						SEB.method_518(0.0f, isGrab ? error_output : error_trash, new Vector2[2] { errorPos1, errorPos2 });
+					}
+					else
+					{
+						// trying to trash or output molecule
+					}
+				}
+
+
+				
+			}
+			else // MOVEMENT PHASE
+			{
+				if (instructionCategory == (enum_144)2) // ROTATE
+				{
+					if (emitter.method_1159() == EmitterSimple || emitter.method_1159() == EmitterSimple)
+					{
+						SEB.method_518(0.0f, error_rotate, new Vector2[1] { errorPos1 });
+					}
+					else
+					{
+						// rotating
+					}
+				}
+				else if (instructionCategory == (enum_144)1) // PISTON
+				{
+					// extend/retract is the only movement we need to cover explicitly
+
+
+
+
+
+
+				}
+
+
+
+
+
+
+
+			}
+		}
+
+
 
 		//run my own version of method_1829 as needed:
 		//- all interfacing emitters with an output instruction DROP, then attempt to output their molecule
@@ -257,13 +368,14 @@ public class MainClass : QuintessentialMod
 		//close						trash molecule
 
 		//restore the index values
+		/*
 		foreach (var kvp in emitterDict)
 		{
 			var emitter = kvp.Key;
 			emitter.field_2703 = emitterDict[emitter];
-			BeamHelper(emitter, partSimStates[emitter], molecules);
 		}
 		sim_dyn.Set("field_3821", partSimStates);
+		*/
 	}
 
 	//------------------------- END HOOKING -------------------------//
@@ -281,41 +393,52 @@ public class MainClass : QuintessentialMod
 		param_4509 = tempOut;
 
 		var partType = part.method_1159();
-		enum_144 instr = ret.field_2548;
+		enum_144 instructionCategory = ret.field_2548;
 		bool partTypeFlag = partType == EmitterSimple || partType == EmitterSimple;
 
-		//translate the instruction, if needed
-		if (partTypeFlag && part.field_2703 == GrabDropTranslate)
+		//////////////////////////////////////////////////////////////////////////////////////will need to change the decoding, probably
+
+		//decode the instruction, if needed
+		if (partTypeFlag && part.field_2703 == GrabDropDecoding)
 		{
-			//translate the emitter instruction for the grab/drop-instruction phase
-			switch (instr)
+			//decode the emitter instruction for the grab/drop-instruction phase
+			switch (instructionCategory)
 			{
-				case (enum_144)0: // NOOP
-				case (enum_144)2: // ROTATE
-				case (enum_144)4: // TRACK
-					ret = class_169.field_1664; // DROP
-					break;
 				case (enum_144)1: // PISTON
 				case (enum_144)3: // PIVOT
 				case (enum_144)5: // GRAB/DROP
 					ret = class_169.field_1663; // GRAB
 					break;
+				case (enum_144)0: // NOOP
+				case (enum_144)2: // ROTATE
+				case (enum_144)4: // TRACK
 				default:
 					break;
 			}
 		}
-		//else if (partTypeFlag && part.field_2703 == MovementTranslate)
-		//{
-		//	//assuming the translated instruction in the grab-drop-instruction phase was executed correctly,
-		//	//then there's no need to translate the instruction during the movement-instruction phase,
-		//	//the literal instruction will give the desired behavior
-		//}
+		else if (partTypeFlag && part.field_2703 == MovementDecoding)
+		{
+			//decode the emitter instruction for the movement-instruction phase
+			switch (instructionCategory)
+			{
+				case (enum_144)1: // PISTON
+					ret = class_169.field_1653; // NOOP
+					break;
+				case (enum_144)0: // NOOP
+				case (enum_144)2: // ROTATE
+				case (enum_144)3: // PIVOT
+				case (enum_144)4: // TRACK
+				case (enum_144)5: // GRAB/DROP
+				default:
+					break;
+			}
+		}
 		else
 		{
 			//either it's NOT an emitter, or we want the literal instruction
-			//so, don't translate
+			//so, don't decode
 		}
-		//return the translated instruction
+		//return the decode instruction
 		return ret;
 	}
 

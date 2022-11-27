@@ -31,7 +31,7 @@ public static class FakeGripper
 
 	private static bool debugDisplay = false; // for troubleshooting purposes
 
-	public static PartType partType = new PartType(); /////////////////////////////////////////////////////////////////////////////////////////////////////////////// try to change to private later
+	public static PartType partType = new PartType(); /////////////////////////////////////////////////////////// try to change to private later
 
 	private static Dictionary<Part, PartSimState> tempFakeGrippers = new();
 
