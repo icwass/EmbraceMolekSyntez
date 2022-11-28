@@ -21,6 +21,7 @@ using Texture = class_256;
 public class MainClass : QuintessentialMod
 {
 	private static IDetour hook_Sim_method_1829;
+	private static IDetour hook_SEB_method_2012;
 	private static PartType EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal;
 	public static Texture debug_arrow, debug_arrowIO, emitterIcon, emitterIconHover, emitter_armBase, emitter_armBaseSwivel;
 
@@ -59,7 +60,10 @@ public class MainClass : QuintessentialMod
 
 	//---------------------------------------------------//
 	//internal helper methods
-
+	public static HexIndex getHexFromPoint(Vector2 point, Vector2 reference)
+	{
+		return class_187.field_1742.method_493(point, reference);
+	}
 
 
 	private static HexIndex BeamHelper(PartSimState partSimState, List<Molecule> molecules, out int dist)
@@ -114,11 +118,7 @@ public class MainClass : QuintessentialMod
 		return minHex;
 	}
 
-
-
-
 	//---------------------------------------------------//
-
 
 	public override void Load()
 	{
@@ -145,6 +145,8 @@ public class MainClass : QuintessentialMod
 		//Interfacing Manipulator: 70g, can also trash and output targets
 		//Universal Manipulator: 100g, a swivel-mount and interfacing manipulator
 
+		float gx = -12f;
+		float gy = -18.5f;
 
 
 		EmitterSimple = new PartType()
@@ -158,11 +160,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
 			/*Icon*/field_1547 = emitterIcon,
 			/*Hover Icon*/field_1548 = emitterIconHover,
-			/*Glow (Shadow)*/ //field_1549 = class_238.field_1989.field_97.field_382,
-			/*Stroke (Outline)*/ //field_1550 = class_238.field_1989.field_97.field_383,
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -171,7 +170,7 @@ public class MainClass : QuintessentialMod
 			renderer.method_528(emitter_armBase, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
 
 			Vector2 vector2_24 = new Vector2(41f, 48f);
-			renderer.method_521(debug_arrow, vector2_24 + new Vector2(-9f, -21f));
+			renderer.method_521(debug_arrow, vector2_24 + new Vector2(gx, gy));
 		});
 
 		EmitterSwivel = new PartType()
@@ -185,11 +184,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
 			/*Icon*/field_1547 = emitterIcon,
 			/*Hover Icon*/field_1548 = emitterIconHover,
-			/*Glow (Shadow)*/ //field_1549 = class_238.field_1989.field_97.field_382,
-			/*Stroke (Outline)*/ //field_1550 = class_238.field_1989.field_97.field_383,
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -198,7 +194,7 @@ public class MainClass : QuintessentialMod
 			renderer.method_528(emitter_armBaseSwivel, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
 
 			Vector2 vector2_24 = new Vector2(41f, 48f);
-			renderer.method_521(debug_arrow, vector2_24 + new Vector2(-9f, -21f));
+			renderer.method_521(debug_arrow, vector2_24 + new Vector2(gx, gy));
 		});
 
 		EmitterIO = new PartType()
@@ -212,11 +208,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
 			/*Icon*/field_1547 = emitterIcon,
 			/*Hover Icon*/field_1548 = emitterIconHover,
-			/*Glow (Shadow)*/ //field_1549 = class_238.field_1989.field_97.field_382,
-			/*Stroke (Outline)*/ //field_1550 = class_238.field_1989.field_97.field_383,
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -225,7 +218,7 @@ public class MainClass : QuintessentialMod
 			renderer.method_528(emitter_armBase, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
 
 			Vector2 vector2_24 = new Vector2(41f, 48f);
-			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(-9f, -21f));
+			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(gx, gy));
 		});
 
 		EmitterUniversal = new PartType()
@@ -239,11 +232,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0, 0) },//default=emptyList
 			/*Icon*/field_1547 = emitterIcon,
 			/*Hover Icon*/field_1548 = emitterIconHover,
-			/*Glow (Shadow)*/ //field_1549 = class_238.field_1989.field_97.field_382,
-			/*Stroke (Outline)*/ //field_1550 = class_238.field_1989.field_97.field_383,
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -252,7 +242,7 @@ public class MainClass : QuintessentialMod
 			renderer.method_528(emitter_armBaseSwivel, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
 
 			Vector2 vector2_24 = new Vector2(41f, 48f);
-			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(-9f, -21f));
+			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(gx, gy));
 		});
 
 		QApi.AddPartTypeToPanel(EmitterSimple, PartTypes.field_1768);//inserts part type after piston
@@ -269,15 +259,21 @@ public class MainClass : QuintessentialMod
 			typeof(Sim).GetMethod("method_1829", BindingFlags.Instance | BindingFlags.NonPublic),
 			typeof(MainClass).GetMethod("OnSimMethod1829", BindingFlags.Static | BindingFlags.NonPublic)
 		);
+		hook_SEB_method_2012 = new Hook(
+			typeof(SolutionEditorBase).GetMethod("method_2012", BindingFlags.Instance | BindingFlags.NonPublic),
+			typeof(MainClass).GetMethod("OnSEBMethod2012", BindingFlags.Static | BindingFlags.NonPublic)
+		);
 	}
 
 	public override void Unload()
 	{
 		//FakeGripper.Unload();
 		hook_Sim_method_1829.Dispose();
+		hook_SEB_method_2012.Dispose();
 	}
 
 	private delegate void orig_Sim_method_1829(Sim self, enum_127 param_5366);
+	private delegate Maybe<Part> orig_SolutionEditorBase_method_2012(SolutionEditorBase self, Vector2 param_5606, Vector2 param_5607, IEnumerable<Part> param_5608);
 
 	private static void OnSimMethod1829(orig_Sim_method_1829 orig, Sim sim_self, enum_127 param_5366)
 	{
@@ -365,14 +361,6 @@ public class MainClass : QuintessentialMod
 			var instructionType = compiledProgramSim.method_852(cycleNumber, emitter, out Maybe<int> _);
 			var instructionCategory = instructionType.field_2548;
 
-
-			
-
-
-
-
-
-
 			//then execute
 			if (isGrabDropPhase)
 			{
@@ -385,12 +373,16 @@ public class MainClass : QuintessentialMod
 					}
 					else
 					{
-						// trying to trash or output molecule
+						if (isGrab)
+						{
+							//try to output the molecule ///////////////////////////////////////////////////////////////////////////////////////
+						}
+						else
+						{
+							//trash the molecule ///////////////////////////////////////////////////////////////////////////////////////////////
+						}
 					}
 				}
-
-
-				
 			}
 			else // MOVEMENT PHASE
 			{
@@ -427,64 +419,36 @@ public class MainClass : QuintessentialMod
 						}
 					}
 				}
-
-
-
-
-
-
-
 			}
 		}
 
-
-
-		//run my own version of method_1829 as needed:
-		//- all interfacing emitters with an output instruction DROP, then attempt to output their molecule
-		//- all interfacing emitters with a trash instruction DROP, then trash their molecule
-		//- all non-interfacing emitters with an inferfacing instruction CRASH
-		//- all non-swivel-mount emitters with a swivel instruction CRASH
-
-
-
-
-		//param_5366 == (enum_127)1 => normal arms run grab/close instructions
-		//param_5366 == (enum_127)0 => normal arms run every other type of instruction
-
-
-		//instructionType.field_2548 == (enum_144) 1, field_2549 == true  =>   // extend
-		//instructionType.field_2548 == (enum_144) 1, field_2549 == false =>   // retract
-		//instructionType.field_2548 == (enum_144) 2, field_2549 == true  =>   // rotate clockwise
-		//instructionType.field_2548 == (enum_144) 2, field_2549 == false =>   // rotate counterclockwise
-		//instructionType.field_2548 == (enum_144) 3, field_2549 == true  =>   // pivot clockwise
-		//instructionType.field_2548 == (enum_144) 3, field_2549 == false =>   // pivot counterclockwise
-		//instructionType.field_2548 == (enum_144) 4, field_2549 == true  =>   // track [+]
-		//instructionType.field_2548 == (enum_144) 4, field_2549 == false =>   // track [-]
-		//instructionType.field_2548 == (enum_144) 5, field_2549 == true  =>   // grab
-		//instructionType.field_2548 == (enum_144) 5, field_2549 == false =>   // close
-
-		//universal emitter behavior:
-		//
-		//extend					drop any molecule i'm holding, grab molecule i'm looking at, push away from me
-		//retract					drop any molecule i'm holding, grab molecule i'm looking at, pull towards me
-		//rotate clockwise			drop any molecule i'm holding, rotate clockwise
-		//rotate counterclockwise	drop any molecule i'm holding, rotate counterclockwise
-		//pivot clockwise			drop any molecule i'm holding, grab molecule i'm looking at, pivot clockwise
-		//pivot counterclockwise	drop any molecule i'm holding, grab molecule i'm looking at, pivot counterclockwise
-		//track [+]					drop any molecule i'm holding, move [+] on track
-		//track [-]					drop any molecule i'm holding, move [-] on track
-		//grab						attempt to output molecule, highest priority, overrides trash and movement
-		//close						trash molecule
-
 		//restore the index values
-		/*
 		foreach (var kvp in emitterDict)
 		{
 			var emitter = kvp.Key;
 			emitter.field_2703 = emitterDict[emitter];
 		}
 		sim_dyn.Set("field_3821", partSimStates);
-		*/
+	}
+
+	private static Maybe<Part> OnSEBMethod2012(orig_SolutionEditorBase_method_2012 orig, SolutionEditorBase SEB_self, Vector2 param_5606, Vector2 param_5607, IEnumerable<Part> param_5608)
+	{
+		Maybe<Part> maybe = orig(SEB_self, param_5606, param_5607, param_5608);
+
+		if (maybe.method_1085()) return maybe;
+		// else, check if we clicked on an emitter, which orig(...) can't find
+		
+		// simpler check - we only care if you click in the hex containing an emitter
+		// (could make this work by changing the graphic so emitters take up the entire hex...)
+
+		var hex = getHexFromPoint(param_5606, param_5607);
+		maybe = (Maybe<Part>)struct_18.field_1431;
+		foreach (Part part in param_5608.Where(x => emitterPartTypes.Contains(x.method_1159())))
+		{
+			bool partWasClicked = part.method_1161() == hex;
+			if (partWasClicked) maybe = (Maybe<Part>)part;
+		}
+		return maybe;
 	}
 
 	//------------------------- END HOOKING -------------------------//
