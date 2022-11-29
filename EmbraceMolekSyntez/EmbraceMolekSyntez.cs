@@ -23,7 +23,7 @@ public class MainClass : QuintessentialMod
 	private static IDetour hook_Sim_method_1829;
 	private static IDetour hook_SEB_method_2012;
 	private static PartType EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal;
-	public static Texture debug_arrow, debug_arrowIO, emitterIcon, emitterIconHover, emitter_armBase, emitter_armBaseSwivel;
+	public static Texture debug_arrow, debug_arrowIO, emitter_armBase, emitter_armBaseSwivel;
 
 	private static List<PartType> emitterPartTypes;
 
@@ -66,7 +66,7 @@ public class MainClass : QuintessentialMod
 	}
 
 
-	private static HexIndex BeamHelper(PartSimState partSimState, List<Molecule> molecules, out int dist)
+	private static HexIndex BeamHelper(PartSimState partSimState, List<Molecule> molecules, Solution solution, out int dist)
 	{
 		//prepare to find where the gripper should go
 		HexIndex pos = partSimState.field_2724;
@@ -98,14 +98,21 @@ public class MainClass : QuintessentialMod
 				}
 			}
 		}
-		List<HexIndex> chamberHexes = new(); //////////////////////////////////// replace later with actual list of chamber wall hexes, somehow
-		foreach (var hex in chamberHexes)
+		HashSet<HexIndex> chamberHexes = new(); //////////////////////////////////// replace later with actual list of chamber wall hexes, somehow
+
+		class_261 class261;
+		if (solution.method_1934().field_2779.method_99<class_261>(out class261))
 		{
-			if (inSight(hex) && beamDistance(hex) < min)
+			// for each chamber, check the wall hexes
+			// we don't want to grab atoms /through/ the walls
+			foreach (class_189 class189 in class261.field_2071)
 			{
-				minHex = pos;
-				min = 0;
-				break;
+				HexIndex origin_hex = class189.field_1746;
+				if (class189.field_1747.field_1729.Any(hex => inSight(hex + origin_hex) && beamDistance(hex + origin_hex) < min))
+				{
+					minHex = pos;
+					break;
+				}
 			}
 		}
 
@@ -120,9 +127,30 @@ public class MainClass : QuintessentialMod
 
 	//---------------------------------------------------//
 
+	public override Type SettingsType => typeof(MySettings);
+	public class MySettings
+	{
+		[SettingsLabel("Use Molek-Syntez-style gif frames.")]
+		public bool replaceGifFrames = false;
+	}
+	public override void ApplySettings()
+	{
+		base.ApplySettings();
+		var SET = (MySettings)Settings;
+		if (SET.replaceGifFrames)
+		{
+			class_238.field_1989.field_99.field_698 = class_235.method_615("embraceMolekSyntez/textures/solution_editor/gif_frame");
+			class_238.field_1989.field_99.field_699 = class_235.method_615("embraceMolekSyntez/textures/solution_editor/gif_frame_pipeline");
+		}
+		else
+		{
+			class_238.field_1989.field_99.field_698 = class_235.method_615("textures/solution_editor/gif_frame");
+			class_238.field_1989.field_99.field_699 = class_235.method_615("textures/solution_editor/gif_frame_pipeline");
+		}
+	}
 	public override void Load()
 	{
-		//
+		Settings = new MySettings();
 	}
 
 	public override void LoadPuzzleContent()
@@ -135,8 +163,6 @@ public class MainClass : QuintessentialMod
 		string path = "embraceMolekSyntez/textures/parts/";
 		debug_arrow = class_235.method_615(path + "debug_arrow");
 		debug_arrowIO = class_235.method_615(path + "debug_arrow_io");
-		emitterIcon = class_235.method_615(path + "icons/emitter");
-		emitterIconHover = class_235.method_615(path + "icons/emitter_hover");
 		emitter_armBase = class_235.method_615(path + "emitter/arm_base");
 		emitter_armBaseSwivel = class_235.method_615(path + "emitter/arm_base_swivel");
 
@@ -160,8 +186,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = emitterIcon,
-			/*Hover Icon*/field_1548 = emitterIconHover,
+			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
+			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -184,8 +210,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = emitterIcon,
-			/*Hover Icon*/field_1548 = emitterIconHover,
+			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitterSwivel"),
+			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitterSwivel_hover"),
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -208,8 +234,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = emitterIcon,
-			/*Hover Icon*/field_1548 = emitterIconHover,
+			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
+			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -232,8 +258,8 @@ public class MainClass : QuintessentialMod
 			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
 			/*Piston?*/field_1535 = true,//default=false
 			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = emitterIcon,
-			/*Hover Icon*/field_1548 = emitterIconHover,
+			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
+			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
 
@@ -253,8 +279,9 @@ public class MainClass : QuintessentialMod
 		emitterPartTypes = new() { EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal };
 
 		//FakeGripper.LoadPuzzleContent();
-		//------------------------- HOOKING -------------------------//
 		On.CompiledProgramGrid.method_852 += CompiledProgramGrid_Method_852; // interfere with how instructions are read
+		On.Sim.method_1827 += Sim_Method_1827; // reset beams at the end of the cycle
+		//------------------------- HOOKING -------------------------//
 		hook_Sim_method_1829 = new Hook(
 			typeof(Sim).GetMethod("method_1829", BindingFlags.Instance | BindingFlags.NonPublic),
 			typeof(MainClass).GetMethod("OnSimMethod1829", BindingFlags.Static | BindingFlags.NonPublic)
@@ -314,7 +341,7 @@ public class MainClass : QuintessentialMod
 				//update emitter and manipulator to the new pos
 				var oldPos = manipulatorState.field_2724;
 				int dist;
-				var newPos = BeamHelper(partSimStates[emitter], molecules, out dist);
+				var newPos = BeamHelper(partSimStates[emitter], molecules, solution, out dist);
 				emitterState.field_2725 = dist;
 				emitterState.field_2736 = dist;
 				manipulatorState.field_2724 = newPos;
@@ -401,7 +428,6 @@ public class MainClass : QuintessentialMod
 				{
 					// extend/retract is the only movement we need to cover explicitly
 					int q = instructionType.field_2549 ? 1 : -1;
-					int num = emitterState.field_2725 + q;
 
 					if (manipulatorState.field_2729.method_99<Molecule>(out _))
 					{
@@ -420,15 +446,13 @@ public class MainClass : QuintessentialMod
 					}
 				}
 			}
-		}
 
-		//restore the index values
-		foreach (var kvp in emitterDict)
-		{
-			var emitter = kvp.Key;
+			//restore the index values
 			emitter.field_2703 = emitterDict[emitter];
 		}
+
 		sim_dyn.Set("field_3821", partSimStates);
+		sim_dyn.Set("field_3828", droppedMolecules);
 	}
 
 	private static Maybe<Part> OnSEBMethod2012(orig_SolutionEditorBase_method_2012 orig, SolutionEditorBase SEB_self, Vector2 param_5606, Vector2 param_5607, IEnumerable<Part> param_5608)
@@ -461,9 +485,11 @@ public class MainClass : QuintessentialMod
 		out Maybe<int> param_4509
 		)
 	{
+		///////////////
 		Maybe<int> tempOut;
 		InstructionType ret = orig(cpg_self, param_4507, part, out tempOut);
 		param_4509 = tempOut;
+		///////////////
 
 		var partType = part.method_1159();
 		enum_144 instructionCategory = ret.field_2548;
@@ -513,6 +539,56 @@ public class MainClass : QuintessentialMod
 		}
 		//return the decode instruction
 		return ret;
+	}
+
+	public static void Sim_Method_1827(
+		On.Sim.orig_method_1827 orig,
+		Sim sim_self
+		)
+	{
+		///////////////
+		orig(sim_self);
+		///////////////
+
+		//reset emitter beams - this is purely for aesthetics
+		var sim_dyn = new DynamicData(sim_self);
+		var SEB = sim_dyn.Get<SolutionEditorBase>("field_3818");
+		var solution = SEB.method_502();
+		var partList = solution.field_3919;
+		var partSimStates = sim_dyn.Get<Dictionary<Part, PartSimState>>("field_3821");
+		var molecules = sim_dyn.Get<List<Molecule>>("field_3823");
+		var droppedMolecules = sim_dyn.Get<List<Molecule>>("field_3828");
+
+		var emitterList = new List<Part>(partList.Where(x => emitterPartTypes.Contains(x.method_1159())));
+
+		foreach (var emitter in emitterList)
+		{
+			var emitterState = partSimStates[emitter];
+			var manipulator = emitter.field_2696[0];
+			var manipulatorState = partSimStates[manipulator];
+
+			//reset the beam again, but for aesthetics
+			//ungrip the manipulator
+			Molecule molecule;
+			if (manipulatorState.field_2729.method_99<Molecule>(out molecule) && !droppedMolecules.Contains(molecule))
+			{
+				//drop the molecule, too
+				droppedMolecules.Add(molecule);
+			}
+			manipulatorState.field_2729 = (Maybe<Molecule>)struct_18.field_1431;
+			manipulatorState.field_2740 = false;
+
+			//update emitter and manipulator to the new pos
+			var oldPos = manipulatorState.field_2724;
+			int dist;
+			var newPos = BeamHelper(partSimStates[emitter], molecules, solution, out dist);
+			emitterState.field_2725 = dist;
+			emitterState.field_2736 = dist;
+			manipulatorState.field_2724 = newPos;
+			manipulatorState.field_2734 = newPos;
+		}
+		sim_dyn.Set("field_3821", partSimStates);
+		sim_dyn.Set("field_3828", droppedMolecules);
 	}
 
 	public override void PostLoad()
