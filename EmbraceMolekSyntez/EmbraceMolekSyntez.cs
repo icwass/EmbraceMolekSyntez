@@ -21,7 +21,6 @@ using Texture = class_256;
 public class MainClass : QuintessentialMod
 {
 	private static IDetour hook_Sim_method_1829;
-	private static IDetour hook_SEB_method_2012;
 	private static PartType EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal;
 	public static Texture debug_arrow, debug_arrowIO, emitter_armBase, emitter_armBaseSwivel;
 
@@ -35,37 +34,8 @@ public class MainClass : QuintessentialMod
 	private static LocString error_output;
 	private static LocString error_rotate;
 
-	public static void playSound(Sound SOUND, float VOLUME, Sim sim = null, SolutionEditorBase seb = null)
-	{
-		float FACTOR = 1f;
-		if (sim != null)
-		{
-			seb = new DynamicData(sim).Get<SolutionEditorBase>("field_3818");
-		}
-		if (seb != null)
-		{
-			if (seb is class_194) // GIF recording, so mute
-			{
-				FACTOR = 0.0f;
-			}
-			else if (seb is SolutionEditorScreen)
-			{
-				var seb_dyn = new DynamicData(seb);
-				bool isQuickMode = seb_dyn.Get<Maybe<int>>("field_4030").method_1085();
-				FACTOR = isQuickMode ? 0.5f : 1f;
-			}
-		}
-		class_158.method_376(SOUND.field_4061, class_269.field_2109 * VOLUME * FACTOR, false);
-	}
-
 	//---------------------------------------------------//
 	//internal helper methods
-	public static HexIndex getHexFromPoint(Vector2 point, Vector2 reference)
-	{
-		return class_187.field_1742.method_493(point, reference);
-	}
-
-
 	private static HexIndex BeamHelper(PartSimState partSimState, List<Molecule> molecules, Solution solution, out int dist)
 	{
 		//prepare to find where the gripper should go
@@ -98,10 +68,9 @@ public class MainClass : QuintessentialMod
 				}
 			}
 		}
-		HashSet<HexIndex> chamberHexes = new(); //////////////////////////////////// replace later with actual list of chamber wall hexes, somehow
 
 		class_261 class261;
-		if (solution.method_1934().field_2779.method_99<class_261>(out class261))
+		if (solution.method_1934().field_2779.method_99(out class261))
 		{
 			// for each chamber, check the wall hexes
 			// we don't want to grab atoms /through/ the walls
@@ -153,6 +122,31 @@ public class MainClass : QuintessentialMod
 		Settings = new MySettings();
 	}
 
+	private PartType emitterMaker(string saveIDsuffix, string namePrefix, string description, int cost, Texture icon, Texture hover)
+	{
+		var part = new PartType()
+		{
+			/*ID*/field_1528 = "embrace-moleksyntez-emitter" + saveIDsuffix,
+			/*Name*/field_1529 = class_134.method_253(namePrefix + " Manipulator", string.Empty),
+			/*Desc*/field_1530 = class_134.method_253(description, string.Empty),
+			/*Cost*/field_1531 = cost,
+			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
+			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
+			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
+			/*Piston?*/field_1535 = true,//default=false
+			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
+			/*Hex Footprint*/field_1540 = new HexIndex[1] { new HexIndex(0,0) },
+			/*Icon*/field_1547 = icon,
+			/*Hover Icon*/field_1548 = hover,
+			/*Permissions*/field_1551 = Permissions.SimpleArm,
+		};
+
+		QApi.AddPartTypeToPanel(part, PartTypes.field_1768);//inserts part type after piston
+		emitterPartTypes.Add(part);
+
+		return part;
+	}
+
 	public override void LoadPuzzleContent()
 	{
 		error_trash = class_134.method_253("This arm cannot dispose of alchemicules.", string.Empty);
@@ -174,23 +168,11 @@ public class MainClass : QuintessentialMod
 		float gx = -12f;
 		float gy = -18.5f;
 
-
-		EmitterSimple = new PartType()
-		{
-			/*ID*/field_1528 = "embrace-moleksyntez-emitter",
-			/*Name*/field_1529 = class_134.method_253("Fixed-Direction Manipulator", string.Empty),
-			/*Desc*/field_1530 = class_134.method_253("A standard manipulator that can push, pull, and pivot targeted alchemicules. Push and pull are executed using the Extend and Retract instructions, respectively.", string.Empty),
-			/*Cost*/field_1531 = 20,
-			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
-			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
-			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
-			/*Piston?*/field_1535 = true,//default=false
-			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
-			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
-			/*Permissions*/field_1551 = Permissions.SimpleArm,
-		};
-
+		EmitterSimple = emitterMaker(
+			"", "Fixed-Direction",
+			"A standard manipulator that can push, pull, and pivot targeted alchemicules. Push and pull are executed using the Extend and Retract instructions, respectively.",
+			20, class_235.method_615(path + "icons/emitter"), class_235.method_615(path + "icons/emitter_hover")
+		);
 		QApi.AddPartType(EmitterSimple, (part, pos, editor, renderer) => {
 			//draw code
 			renderer.method_528(emitter_armBase, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
@@ -199,22 +181,11 @@ public class MainClass : QuintessentialMod
 			renderer.method_521(debug_arrow, vector2_24 + new Vector2(gx, gy));
 		});
 
-		EmitterSwivel = new PartType()
-		{
-			/*ID*/field_1528 = "embrace-moleksyntez-emitter-swivel",
-			/*Name*/field_1529 = class_134.method_253("Rotating Manipulator", string.Empty),
-			/*Desc*/field_1530 = class_134.method_253("A manipulator that can push, pull, and pivot targeted alchemicules, as well as rotate to aim in a different direction.", string.Empty),
-			/*Cost*/field_1531 = 30,
-			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
-			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
-			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
-			/*Piston?*/field_1535 = true,//default=false
-			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitterSwivel"),
-			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitterSwivel_hover"),
-			/*Permissions*/field_1551 = Permissions.SimpleArm,
-		};
-
+		EmitterSwivel = emitterMaker(
+			"-swivel", "Rotating",
+			"A manipulator that can push, pull, and pivot targeted alchemicules, as well as rotate to aim in a different direction.",
+			30, class_235.method_615(path + "icons/emitterSwivel"), class_235.method_615(path + "icons/emitterSwivel_hover")
+		);
 		QApi.AddPartType(EmitterSwivel, (part, pos, editor, renderer) => {
 			//draw code
 			renderer.method_528(emitter_armBaseSwivel, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
@@ -222,23 +193,12 @@ public class MainClass : QuintessentialMod
 			Vector2 vector2_24 = new Vector2(41f, 48f);
 			renderer.method_521(debug_arrow, vector2_24 + new Vector2(gx, gy));
 		});
-
-		EmitterIO = new PartType()
-		{
-			/*ID*/field_1528 = "embrace-moleksyntez-emitter-io",
-			/*Name*/field_1529 = class_134.method_253("Interface Manipulator", string.Empty),
-			/*Desc*/field_1530 = class_134.method_253("A manipulator that can push, pull, pivot, output, and dispose targeted alchemicules.", string.Empty),
-			/*Cost*/field_1531 = 50,
-			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
-			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
-			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
-			/*Piston?*/field_1535 = true,//default=false
-			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
-			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
-			/*Permissions*/field_1551 = Permissions.SimpleArm,
-		};
-
+		/*
+		EmitterIO = emitterMaker(
+			"-io", "Interface",
+			"A manipulator that can push, pull, pivot, output, and dispose targeted alchemicules.",
+			50, class_235.method_615(path + "icons/emitter"), class_235.method_615(path + "icons/emitter_hover")
+		);
 		QApi.AddPartType(EmitterIO, (part, pos, editor, renderer) => {
 			//draw code
 			renderer.method_528(emitter_armBase, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
@@ -246,23 +206,13 @@ public class MainClass : QuintessentialMod
 			Vector2 vector2_24 = new Vector2(41f, 48f);
 			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(gx, gy));
 		});
-
-		EmitterUniversal = new PartType()
-		{
-			/*ID*/field_1528 = "embrace-moleksyntez-emitter-universal",
-			/*Name*/field_1529 = class_134.method_253("Universal Manipulator", string.Empty),
-			/*Desc*/field_1530 = class_134.method_253("A manipulator that can push, pull, pivot, output, and dispose targeted alchemicules, as well as rotate to aim in a different direction.", string.Empty),
-			/*Cost*/field_1531 = 80,
-			/*Type*/field_1532 = (enum_2) 1,//default=(enum_2)0; arm=(enum_2)1; track=(enum_2)2;
-			/*Programmable?*/field_1533 = true,//default=false, which disables programmability and atom collision
-			/*Gripper Positions*/field_1534 = new HexRotation[1] { HexRotation.R0 },//default=empty; each entry defines a gripper
-			/*Piston?*/field_1535 = true,//default=false
-			/*Force-rotatable*/field_1536 = true,//default=false, but true for arms and the berlo, which are 1-hex big but can be rotated individually
-			/*Icon*/field_1547 = class_235.method_615(path + "icons/emitter"),
-			/*Hover Icon*/field_1548 = class_235.method_615(path + "icons/emitter_hover"),
-			/*Permissions*/field_1551 = Permissions.SimpleArm,
-		};
-
+		*/
+		/*
+		EmitterUniversal = emitterMaker(
+			"-universal", "Universal",
+			"A manipulator that can push, pull, pivot, output, and dispose targeted alchemicules, as well as rotate to aim in a different direction.",
+			80, class_235.method_615(path + "icons/emitter"), class_235.method_615(path + "icons/emitter_hover")
+		);
 		QApi.AddPartType(EmitterUniversal, (part, pos, editor, renderer) => {
 			//draw code
 			renderer.method_528(emitter_armBaseSwivel, new HexIndex(0, 0), new Vector2(0.0f, 0.0f));
@@ -270,15 +220,8 @@ public class MainClass : QuintessentialMod
 			Vector2 vector2_24 = new Vector2(41f, 48f);
 			renderer.method_521(debug_arrowIO, vector2_24 + new Vector2(gx, gy));
 		});
+		*/
 
-		QApi.AddPartTypeToPanel(EmitterSimple, PartTypes.field_1768);//inserts part type after piston
-		QApi.AddPartTypeToPanel(EmitterSwivel, PartTypes.field_1768);//inserts part type after piston
-		//QApi.AddPartTypeToPanel(EmitterIO, PartTypes.field_1768);//inserts part type after piston
-		//QApi.AddPartTypeToPanel(EmitterUniversal, PartTypes.field_1768);//inserts part type after piston
-
-		emitterPartTypes = new() { EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal };
-
-		//FakeGripper.LoadPuzzleContent();
 		On.CompiledProgramGrid.method_852 += CompiledProgramGrid_Method_852; // interfere with how instructions are read
 		On.Sim.method_1827 += Sim_Method_1827; // reset beams at the end of the cycle
 		//------------------------- HOOKING -------------------------//
@@ -286,17 +229,11 @@ public class MainClass : QuintessentialMod
 			typeof(Sim).GetMethod("method_1829", BindingFlags.Instance | BindingFlags.NonPublic),
 			typeof(MainClass).GetMethod("OnSimMethod1829", BindingFlags.Static | BindingFlags.NonPublic)
 		);
-		hook_SEB_method_2012 = new Hook(
-			typeof(SolutionEditorBase).GetMethod("method_2012", BindingFlags.Instance | BindingFlags.NonPublic),
-			typeof(MainClass).GetMethod("OnSEBMethod2012", BindingFlags.Static | BindingFlags.NonPublic)
-		);
 	}
 
 	public override void Unload()
 	{
-		//FakeGripper.Unload();
 		hook_Sim_method_1829.Dispose();
-		hook_SEB_method_2012.Dispose();
 	}
 
 	private delegate void orig_Sim_method_1829(Sim self, enum_127 param_5366);
@@ -329,7 +266,7 @@ public class MainClass : QuintessentialMod
 			{
 				//then ungrip the manipulator
 				Molecule molecule;
-				if (manipulatorState.field_2729.method_99<Molecule>(out molecule) && !droppedMolecules.Contains(molecule))
+				if (manipulatorState.field_2729.method_99(out molecule) && !droppedMolecules.Contains(molecule))
 				{
 					//drop the molecule, too
 					droppedMolecules.Add(molecule);
@@ -429,7 +366,7 @@ public class MainClass : QuintessentialMod
 					// extend/retract is the only movement we need to cover explicitly
 					int q = instructionType.field_2549 ? 1 : -1;
 
-					if (manipulatorState.field_2729.method_99<Molecule>(out _))
+					if (manipulatorState.field_2729.method_99(out _))
 					{
 						//holding a molecule i can actually move
 						emitterState.field_2725 += q;
@@ -437,7 +374,7 @@ public class MainClass : QuintessentialMod
 						for (int index = 0; index < emitter.field_2696.Length; ++index)
 						{
 							HexRotation hexRotation;
-							if (emitter.method_1159().method_311(index).method_99<HexRotation>(out hexRotation))
+							if (emitter.method_1159().method_311(index).method_99(out hexRotation))
 							{
 								HexIndex hexIndex = new HexIndex(q, 0).Rotated(hexRotation + emitterState.field_2726);
 								Method_1852.Invoke(sim_self, new object[] { emitter.field_2696[index], hexIndex });
@@ -453,26 +390,6 @@ public class MainClass : QuintessentialMod
 
 		sim_dyn.Set("field_3821", partSimStates);
 		sim_dyn.Set("field_3828", droppedMolecules);
-	}
-
-	private static Maybe<Part> OnSEBMethod2012(orig_SolutionEditorBase_method_2012 orig, SolutionEditorBase SEB_self, Vector2 param_5606, Vector2 param_5607, IEnumerable<Part> param_5608)
-	{
-		Maybe<Part> maybe = orig(SEB_self, param_5606, param_5607, param_5608);
-
-		if (maybe.method_1085()) return maybe;
-		// else, check if we clicked on an emitter, which orig(...) can't find
-		
-		// simpler check - we only care if you click in the hex containing an emitter
-		// (could make this work by changing the graphic so emitters take up the entire hex...)
-
-		var hex = getHexFromPoint(param_5606, param_5607);
-		maybe = (Maybe<Part>)struct_18.field_1431;
-		foreach (Part part in param_5608.Where(x => emitterPartTypes.Contains(x.method_1159())))
-		{
-			bool partWasClicked = part.method_1161() == hex;
-			if (partWasClicked) maybe = (Maybe<Part>)part;
-		}
-		return maybe;
 	}
 
 	//------------------------- END HOOKING -------------------------//
