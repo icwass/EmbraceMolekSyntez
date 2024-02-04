@@ -24,7 +24,7 @@ public class MainClass : QuintessentialMod
 	private static PartType EmitterSimple, EmitterSwivel, EmitterIO, EmitterUniversal;
 	public static Texture debug_arrow, debug_arrowIO, emitter_armBase, emitter_armBaseSwivel;
 
-	private static List<PartType> emitterPartTypes;
+	private static List<PartType> emitterPartTypes = new();
 
 	private const int NoDecoding = 0;
 	private const int GrabDropDecoding = 1;
@@ -140,10 +140,8 @@ public class MainClass : QuintessentialMod
 			/*Hover Icon*/field_1548 = hover,
 			/*Permissions*/field_1551 = Permissions.SimpleArm,
 		};
-
 		QApi.AddPartTypeToPanel(part, PartTypes.field_1768);//inserts part type after piston
 		emitterPartTypes.Add(part);
-
 		return part;
 	}
 
